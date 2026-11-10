@@ -2,7 +2,7 @@
   "name": "polipetto-claude",
   "displayName": "Polipetto per Claude Code",
   "description": "%description%",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "aebwp",
   "license": "MIT",
   "pricing": "Free",
@@ -44,7 +44,7 @@
         {
           "type": "webview",
           "id": "polipetto.view",
-          "name": "Claude"
+          "name": "Claude Worker"
         }
       ]
     },

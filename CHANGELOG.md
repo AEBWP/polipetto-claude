@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- The sidebar section is now called "Claude Worker".
+
 ## 0.5.0
 
 First public release.
