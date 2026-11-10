@@ -305,70 +305,55 @@ test('an agent that was stopped is not shown as completed', async (t) => {
   assert.deepStrictEqual([...s.tracker.snapshot().find((a) => a.id === SESSION).tasks].sort(), ['in_progress', 'pending']);
 });
 
-test('a simple request shows no dots, a longer sequence shows its phases', async (t) => {
+test('without a list, past steps are reported as steps and never as dots', async (t) => {
   const s = setup();
   t.after(s.cleanup);
   await s.tracker.tick();
-  s.write(s.file, user('x'), tool('Read'), toolResult(), tool('Grep'), toolResult(), tool('Read'), toolResult());
+  s.write(s.file, user('x'));
   await s.tracker.tick();
-  assert.deepStrictEqual(s.last().agents[0].tasks, [], 'three quick reads are one dot');
+  assert.strictEqual(s.last().agents[0].steps, null, 'no tool has run yet');
 
-  s.write(s.file, tool('Edit'), toolResult());
-  await s.tracker.tick();
-  assert.deepStrictEqual(s.last().agents[0].tasks, ['completed', 'in_progress']);
-
-  s.write(s.file, tool('Bash'));
-  await s.tracker.tick();
-  assert.deepStrictEqual(s.last().agents[0].tasks, ['completed', 'completed', 'in_progress']);
-
-  s.write(s.file, toolResult(), tool('Bash'), toolResult(), tool('PowerShell'));
-  await s.tracker.tick();
-  assert.strictEqual(s.last().agents[0].tasks.length, 3, 'a short repeat of one phase adds no dot');
-});
-
-test('a long run of one kind of work grows by a dot every three calls', async (t) => {
-  const s = setup();
-  t.after(s.cleanup);
-  await s.tracker.tick();
-  s.write(s.file, user('x'), tool('Bash'), tool('Bash'), tool('Bash'));
+  s.write(s.file, tool('Read'), toolResult(), tool('Grep'), toolResult());
   await s.tracker.tick();
   assert.deepStrictEqual(s.last().agents[0].tasks, []);
-  s.write(s.file, tool('Bash'));
+  assert.deepStrictEqual(s.last().agents[0].steps, { count: 2, kind: 'read' });
+
+  s.write(s.file, tool('Edit'), toolResult(), tool('Bash'));
   await s.tracker.tick();
-  assert.deepStrictEqual(s.last().agents[0].tasks, ['completed', 'in_progress']);
-  s.write(s.file, tool('Bash'), tool('Bash'), tool('Bash'));
-  await s.tracker.tick();
-  assert.strictEqual(s.last().agents[0].tasks.length, 3);
+  assert.deepStrictEqual(s.last().agents[0].tasks, []);
+  assert.deepStrictEqual(s.last().agents[0].steps, { count: 4, kind: 'run' });
 });
 
-test('phases restart with a new request and yield to a real list', async (t) => {
+test('steps restart with a new request and yield to a real list', async (t) => {
   const s = setup();
   t.after(s.cleanup);
   await s.tracker.tick();
-  s.write(s.file, user('x'), tool('Read'), tool('Edit'), tool('Bash'));
+  s.write(s.file, user('x'), tool('Read'), tool('Edit'));
   await s.tracker.tick();
-  assert.strictEqual(s.last().agents[0].tasks.length, 3);
+  assert.strictEqual(s.last().agents[0].steps.count, 2);
 
   s.write(s.file, call('TodoWrite', { todos: [{ status: 'in_progress' }] }, 't1'));
   await s.tracker.tick();
   assert.deepStrictEqual(s.last().agents[0].tasks, ['in_progress']);
+  assert.strictEqual(s.last().agents[0].steps, null);
 
   s.write(s.file, call('TodoWrite', { todos: [{ status: 'completed' }] }, 't2'));
   await s.tracker.tick();
-  assert.strictEqual(s.last().agents[0].tasks.length, 3, 'phases beat a finished list');
+  assert.deepStrictEqual(s.last().agents[0].tasks, ['completed'], 'a finished list is real and stays');
 
   s.write(s.file, user('nuova richiesta'), tool('Read'));
   await s.tracker.tick();
   assert.deepStrictEqual(s.last().agents[0].tasks, []);
+  assert.deepStrictEqual(s.last().agents[0].steps, { count: 1, kind: 'read' });
 });
 
-test('bookkeeping tools are not phases', async (t) => {
+test('bookkeeping tools are not steps', async (t) => {
   const s = setup();
   t.after(s.cleanup);
   await s.tracker.tick();
-  s.write(s.file, user('x'), tool('Read'), call('mcp__ccd_turn__update_plan', { advance: true }, 'p'), tool('AskUserQuestion'), tool('Read'));
+  s.write(s.file, user('x'), tool('Read'), tool('TaskList'), tool('AskUserQuestion'), tool('Read'));
   await s.tracker.tick();
-  assert.deepStrictEqual(s.tracker.entries.get(s.file).phases, ['read']);
+  assert.strictEqual(s.tracker.entries.get(s.file).stepCount, 2);
 });
 
 test('each agent keeps its own list', async (t) => {

@@ -17,6 +17,11 @@
   const LIST_TOP = -1;
   const SLOT_W_WITH_LIST = LIST_X + LIST_W + 3;
   const SCALES = [5, 4, 3, 2];
+  const BUBBLE_START_Y = 8;
+  const BUBBLE_RISE = 4; // cells per second
+  const BUBBLE_LIFE_S = 4.25;
+  const BUBBLE_MAX_NEW = 3; // a burst of steps read at once stays legible
+  const BUBBLE_GAP_S = 0.3;
   const CELEBRATE_S = 2.6;
   const SQUEEZE_S = 2.6;
   const SQUEEZE_RELEASE = 0.75; // fraction of the squeeze after which it pops back
@@ -44,9 +49,25 @@
     activeDim: '#F0B39B',
     done: '#3FB950',
   };
+  const STEP_COLOR = {
+    read: '#58A6FF',
+    write: '#F0B429',
+    run: '#A371F7',
+    web: '#39C5CF',
+    delegate: '#F778BA',
+    tool: '#8B949E',
+  };
 
   const GLYPHS = {
-    bulb: { color: '#E3A008', rows: ['.###.', '#####', '.###.', '..#..', '.###.'] },
+    bulb: {
+      color: '#E3A008',
+      base: '#57606A',
+      fps: 2.5,
+      frames: [
+        ['..###..', '.#.###.', '.#####.', '..###..', '..===..'],
+        ['#.###.#', '.#.###.', '.#####.', '#.###.#', '..===..'],
+      ],
+    },
     terminal: { color: '#238636', rows: ['#......', '.#.....', '..#....', '.#.....', '#...###'] },
     pencil: { color: '#B35900', rows: ['.....##', '....###', '...##..', '..##...', '###....'] },
     page: { color: '#57606A', rows: ['#####', '.....', '#####', '.....', '###..'] },
@@ -59,12 +80,13 @@
     cross: { color: '#CF222E', rows: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'] },
     flask: { color: '#0E8A8A', rows: ['.###.', '..#..', '.#.#.', '#...#', '#####'] },
     check: { color: '#1A7F37', rows: ['....#', '...##', '#.##.', '###..', '.#...'] },
-    hammer: {
-      color: '#9A6700',
-      fps: 5,
+    bricks: {
+      color: '#B35900',
+      fps: 2,
       frames: [
-        ['#####', '#####', '..#..', '..#..', '..#..'],
-        ['...##', '..###', '.###.', '##...', '#....'],
+        ['.......', '.......', '.......', '.......', '###.###'],
+        ['.......', '.......', '#.###.#', '.......', '###.###'],
+        ['###.###', '.......', '#.###.#', '.......', '###.###'],
       ],
     },
     stamp: {
@@ -131,7 +153,7 @@
     error: 'cross',
     test: 'flask',
     passed: 'check',
-    build: 'hammer',
+    build: 'bricks',
     commit: 'stamp',
     push: 'arrowUp',
     pull: 'arrowDown',
@@ -168,7 +190,10 @@
   }
 
   function listsVisible() {
-    return actors.some((a) => a.tasks.length > 0) || latestAgents.some((a) => a.tasks && a.tasks.length > 0);
+    return (
+      actors.some((a) => a.tasks.length > 0 || a.stepCount > 0) ||
+      latestAgents.some((a) => (a.tasks && a.tasks.length > 0) || a.steps)
+    );
   }
 
   function slotCells() {
@@ -295,6 +320,7 @@
     if (mode === 'idle') {
       a.idleSince = time;
       a.tasks = [];
+      a.stepCount = 0;
       a.boss = false;
       a.parentAgentId = null;
       startBehavior(a, 'rest', rand(1, 3));
@@ -338,6 +364,8 @@
       bubbleAt: -Infinity,
       squeezeAt: -Infinity,
       squeezeReleased: true,
+      stepCount: 0,
+      floats: [],
     };
     actors.push(a);
     return a;
@@ -428,6 +456,7 @@
       actor.step = agent.step;
       syncTasks(actor, agent.tasks || []);
       setMode(actor, 'work', agent.activity);
+      syncSteps(actor, agent.steps);
     }
   }
 
@@ -469,6 +498,21 @@
     a.glanceUntil = time + 1.4;
   }
 
+  /** One rising bubble per new step; a request that starts over has a lower count. */
+  function syncSteps(a, steps) {
+    const count = steps ? steps.count : 0;
+    if (count < a.stepCount) a.stepCount = 0;
+    const fresh = Math.min(BUBBLE_MAX_NEW, count - a.stepCount);
+    for (let i = 0; i < fresh; i++) {
+      a.floats.push({
+        born: time + i * BUBBLE_GAP_S,
+        color: STEP_COLOR[steps.kind] || STEP_COLOR.tool,
+        wobble: rand(0, Math.PI * 2),
+      });
+    }
+    a.stepCount = count;
+  }
+
   function nextBubble(a) {
     a.thinkVariant = 1 - a.thinkVariant;
     a.bubbleSide = -a.bubbleSide;
@@ -499,6 +543,7 @@
         a.activity = agent.activity;
         a.parentAgentId = agent.parentId;
         syncTasks(a, agent.tasks || []);
+        syncSteps(a, agent.steps);
         if (agent.step !== a.step) {
           a.step = agent.step;
           nextBubble(a);
@@ -551,6 +596,7 @@
     time += dt;
 
     for (const a of actors.slice()) {
+      a.floats = a.floats.filter((f) => time - f.born < BUBBLE_LIFE_S);
       if (a.mode === 'idle') updateIdle(a);
       if (a.mode === 'celebrate') {
         if (time - a.lastConfetti > 0.35) {
@@ -765,6 +811,7 @@
     rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
         if (row[x] === '#') R(x0 + x, top + 1 + y, 1, 1, glyph.color);
+        else if (row[x] === '=') R(x0 + x, top + 1 + y, 1, 1, glyph.base);
       }
     });
   }
@@ -780,6 +827,21 @@
     });
 
     if (isGlancing(a)) R(LIST_X - 1, listRowY(Math.max(0, current - start)), 1, 1, C.scan);
+  }
+
+  function drawFloats(a, R) {
+    for (const f of a.floats) {
+      const age = time - f.born;
+      if (age < 0) continue;
+      const y = Math.round(BUBBLE_START_Y - age * BUBBLE_RISE);
+      const x = LIST_X + Math.round(Math.sin(age * 2.6 + f.wobble) * 0.5 + 0.5);
+      const fade = y < -5 ? Math.max(0, (y + 9) / 4) : 1;
+      ctx.globalAlpha = fade;
+      R(x, y, 2, 2, f.color);
+      ctx.globalAlpha = fade * 0.75;
+      R(x, y, 1, 1, '#FFFFFF');
+    }
+    ctx.globalAlpha = 1;
   }
 
   function linkPoints(child, parent) {
@@ -878,6 +940,7 @@
 
     drawProp(a, a.mode === 'celebrate' ? R : R0, q);
     drawList(a, R0);
+    drawFloats(a, R0);
   }
 
   function render() {

@@ -153,9 +153,6 @@ const TASK_STATUSES = new Set(['pending', 'in_progress', 'completed']);
 const SPAWN_TOOLS = new Set(['Agent', 'Task']);
 
 const PLAN_TOOL = 'mcp__ccd_turn__update_plan';
-// A single dot is not a sequence; a long run of one kind of work still grows.
-const MIN_PHASES = 2;
-const CALLS_PER_DOT = 3;
 let touchCounter = 0;
 
 function taskStatus(status) {
@@ -182,22 +179,18 @@ function applyPlan(e, input) {
   if (typeof input.start === 'number') setStep(input.start, 'in_progress');
 }
 
-/** Reading and searching are one phase of the work; bookkeeping tools are not work at all. */
-function phaseForTool(name) {
+/** Reading and searching are one kind of step; bookkeeping tools are not work at all. */
+function stepKindForTool(name) {
   const activity = activityForTool(name);
   if (activity === 'plan' || activity === 'ask') return null;
   return activity === 'search' ? 'read' : activity;
 }
 
-function recordPhase(e, toolName) {
-  const phase = phaseForTool(toolName);
-  if (!phase) return;
-  if (e.phases[e.phases.length - 1] === phase && e.phaseCalls < CALLS_PER_DOT) {
-    e.phaseCalls++;
-  } else {
-    e.phases.push(phase);
-    e.phaseCalls = 1;
-  }
+function countStep(e, toolName) {
+  const kind = stepKindForTool(toolName);
+  if (!kind) return;
+  e.stepCount++;
+  e.stepKind = kind;
 }
 
 function isUserRequest(rec) {
@@ -291,10 +284,6 @@ class Tracker {
         return child.finishedOk ? 'completed' : 'pending';
       });
     }
-    if (e.phases.length >= MIN_PHASES) {
-      const last = e.phases.length - 1;
-      return e.phases.map((_, i) => (i === last && e.state === 'working' ? 'in_progress' : 'completed'));
-    }
     return lists.length ? lists[0].items.map((item) => item.status) : [];
   }
 
@@ -312,8 +301,8 @@ class Tracker {
   _startRequest(e) {
     if (e.tasks.every((t) => t.status === 'completed')) e.tasks = [];
     if (e.plan.every((t) => t.status === 'completed')) e.plan = [];
-    e.phases = [];
-    e.phaseCalls = 0;
+    e.stepCount = 0;
+    e.stepKind = null;
     for (const [id, child] of e.agentRuns) {
       if (child.state !== 'working') e.agentRuns.delete(id);
     }
@@ -348,13 +337,16 @@ class Tracker {
     const busy = this._busyParents();
     for (const e of this.entries.values()) {
       if (e.state === 'working' || busy.has(e.id)) {
+        const tasks = this._relevantList(e);
         agents.push({
           id: e.id,
           kind: e.kind,
           parentId: this._parentId(e),
           activity: e.state === 'working' ? e.activity : 'supervise',
           step: e.step,
-          tasks: this._relevantList(e),
+          tasks,
+          // Past steps say nothing about what is left, so they are never drawn as a list.
+          steps: tasks.length === 0 && e.state === 'working' && e.stepCount > 0 ? { count: e.stepCount, kind: e.stepKind } : null,
         });
       }
     }
@@ -427,8 +419,8 @@ class Tracker {
       step: 0,
       tasks: [],
       plan: [],
-      phases: [],
-      phaseCalls: 0,
+      stepCount: 0,
+      stepKind: null,
       testRuns: new Set(),
       tasksTouched: 0,
       planTouched: 0,
@@ -505,7 +497,7 @@ class Tracker {
     if (rec.type === 'assistant' && Array.isArray(rec.message && rec.message.content)) {
       for (const b of rec.message.content) {
         if (b && b.type === 'tool_use' && SPAWN_TOOLS.has(b.name)) this.toolOwners.set(b.id, e.id);
-        if (b && b.type === 'tool_use') recordPhase(e, b.name);
+        if (b && b.type === 'tool_use') countStep(e, b.name);
         // A background run reports only that it started, which says nothing about the tests.
         if (b && b.type === 'tool_use' && activityForToolUse(b) === 'test' && !(b.input && b.input.run_in_background)) {
           e.testRuns.add(b.id);
@@ -630,4 +622,4 @@ async function readRange(file, position, length) {
   }
 }
 
-module.exports = { Tracker, classify, activityForTool, commandKind, updateTasks, phaseForTool, isUserRequest };
+module.exports = { Tracker, classify, activityForTool, commandKind, updateTasks, stepKindForTool, isUserRequest };

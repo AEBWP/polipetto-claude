@@ -18,7 +18,7 @@ Quando Claude lavora, l'animazione segue l'attività reale:
 | --- | --- | --- |
 | Eseguendo uno script o un comando | lavora al computer | terminale |
 | Eseguendo i test | lavora al computer, poi salta di gioia se passano e trema se falliscono | provetta, poi spunta o croce rossa |
-| Compilando o creando un pacchetto | martella al computer | martello |
+| Compilando o creando un pacchetto | lavora di gran lena al computer | muro di mattoni che cresce |
 | Facendo un commit con git | lavora al computer | timbro |
 | Facendo push o pull con git | lavora al computer | freccia in su o in giù |
 | Installando dipendenze | lavora al computer | pacco che si apre |
@@ -46,10 +46,9 @@ Accanto a ogni polipetto, una colonna di puntini mostra l'avanzamento reale: gri
 
 1. Una lista o un piano ancora aperti: gli strumenti di lista di Claude Code, o il piano dell'app desktop di Claude.
 2. Per un agente che ne ha lanciati altri, un puntino per ogni agente lanciato.
-3. Le fasi del lavoro svolto finora (lettura, modifica, esecuzione...), dalla seconda fase in poi, con un puntino in più ogni pochi passi dello stesso tipo, così solo una richiesta rapida non mostra nulla. Questi puntini indicano ciò che è stato fatto e la fase in corso, mai quelle future.
-4. Una lista già conclusa.
+3. Una lista già conclusa.
 
-Senza nessuna di queste, non compaiono puntini.
+Quando Claude non ha dichiarato i passi in anticipo non c'è un avanzamento da misurare, quindi a ogni passo sale una bolla colorata: blu per la lettura, ambra per le modifiche, viola per l'esecuzione, azzurra per il web, rosa per le deleghe e grigia per gli altri strumenti.
 
 Un agente che ne lancia altri diventa viola, si sposta sopra di loro ed è collegato a loro da linee. Festeggia solo dopo che tutti i suoi agenti hanno finito.
 

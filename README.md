@@ -18,7 +18,7 @@ When Claude works, the animation follows the real activity:
 | --- | --- | --- |
 | Running a script or command | works at the computer | terminal |
 | Running tests | works at the computer, then jumps for joy if they pass and shakes if they fail | flask, then check mark or red cross |
-| Building or packaging | hammers at the computer | hammer |
+| Building or packaging | works hard at the computer | wall of bricks going up |
 | Committing with git | works at the computer | stamp |
 | Pushing or pulling with git | works at the computer | arrow up or down |
 | Installing dependencies | works at the computer | parcel opening |
@@ -46,10 +46,9 @@ Beside each octopus, a column of dots shows real progress: grey to do, orange in
 
 1. An open task list or plan: Claude Code's task tools, or the plan of the Claude desktop app.
 2. For an agent that launched others, one dot per launched agent.
-3. The phases of the work so far (reading, editing, running...), from the second phase on, adding a dot for every few steps of the same kind, so only a quick request shows nothing. These dots cover what has been done and the current phase, never future ones.
-4. A list that is already finished.
+3. A list that is already finished.
 
-With none of these, no dots appear.
+When Claude has not declared its steps in advance, there is nothing to measure progress against, so a coloured bubble rises at each step instead: blue for reading, amber for editing, purple for running, teal for the web, pink for delegating and grey for other tools.
 
 An agent that launches others turns purple, moves above them and is connected to them by lines. It celebrates only after all of its agents have finished.
 

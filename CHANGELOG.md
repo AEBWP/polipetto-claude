@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- When Claude has not declared its steps in advance, coloured bubbles rise at each step instead of a column of green dots.
+- Builds show a wall of bricks going up.
+- A clearer light bulb for thinking, which switches on and off.
+
 ## 0.6.0
 
 - A column of dots beside each octopus shows real progress: task lists, the Claude desktop app's plan, launched agents, or the phases of the work.
