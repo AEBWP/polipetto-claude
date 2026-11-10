@@ -10,8 +10,16 @@
   const GH = 9;
   const SLOT_W = GW + 5; // includes room for props
   const SLOT_H = GH + 9;
+  const LIST_X = GW + 1; // the task sheet sits beside the sprite
+  const LIST_W = 2;
+  const LIST_ROWS = 4;
+  const LIST_PITCH = 3;
+  const LIST_TOP = -1;
+  const SLOT_W_WITH_LIST = LIST_X + LIST_W + 3;
   const SCALES = [5, 4, 3, 2];
   const CELEBRATE_S = 2.6;
+  const SQUEEZE_S = 2.6;
+  const SQUEEZE_RELEASE = 0.75; // fraction of the squeeze after which it pops back
   const SLEEP_AFTER_S = 70;
   const SLEEP_FOR_S = 30;
 
@@ -21,14 +29,21 @@
     shadow: 'rgba(127,127,127,0.25)',
     metal: '#4B5563',
     metalLight: '#9CA3AF',
-    page: '#F5F1E8',
-    ink: '#A8A29E',
-    spine: '#8B5E3C',
+    lens: '#F5F1E8',
     bubble: '#FFFFFF',
     outline: '#8B949E',
     check: '#3FB950',
+    boss: '#8A7BE8',
+    link: 'rgba(138,123,232,0.55)',
+    signal: '#C9C1FF',
+    scan: '#58A6FF',
   };
-  const CONFETTI = ['#D97757', '#F2C14E', '#3FB950', '#58A6FF', '#E06C9F'];
+  const LIST = {
+    pending: '#8B949E',
+    active: '#D97757',
+    activeDim: '#F0B39B',
+    done: '#3FB950',
+  };
 
   const GLYPHS = {
     bulb: { color: '#E3A008', rows: ['.###.', '#####', '.###.', '..#..', '.###.'] },
@@ -42,6 +57,65 @@
     checklist: { color: '#8250DF', rows: ['#.###', '.....', '#.###', '.....', '#.###'] },
     gear: { color: '#57606A', rows: ['#.#.#', '.###.', '##.##', '.###.', '#.#.#'] },
     cross: { color: '#CF222E', rows: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'] },
+    flask: { color: '#0E8A8A', rows: ['.###.', '..#..', '.#.#.', '#...#', '#####'] },
+    check: { color: '#1A7F37', rows: ['....#', '...##', '#.##.', '###..', '.#...'] },
+    hammer: {
+      color: '#9A6700',
+      fps: 5,
+      frames: [
+        ['#####', '#####', '..#..', '..#..', '..#..'],
+        ['...##', '..###', '.###.', '##...', '#....'],
+      ],
+    },
+    stamp: {
+      color: '#BC4C00',
+      fps: 3,
+      frames: [
+        ['.###.', '..#..', '#####', '.....', '#.#.#'],
+        ['.....', '.###.', '..#..', '#####', '#.#.#'],
+      ],
+    },
+    arrowUp: {
+      color: '#2F81F7',
+      fps: 4,
+      frames: [
+        ['..#..', '.###.', '#.#.#', '..#..', '..#..'],
+        ['.###.', '#.#.#', '..#..', '..#..', '.....'],
+      ],
+    },
+    arrowDown: {
+      color: '#1A7F37',
+      fps: 4,
+      frames: [
+        ['..#..', '..#..', '#.#.#', '.###.', '..#..'],
+        ['.....', '..#..', '..#..', '#.#.#', '.###.'],
+      ],
+    },
+    parcel: {
+      color: '#9A6700',
+      fps: 2,
+      frames: [
+        ['#####', '#.#.#', '#####', '#...#', '#####'],
+        ['#...#', '.#.#.', '#####', '#...#', '#####'],
+      ],
+    },
+    rocket: {
+      color: '#E8590C',
+      fps: 6,
+      frames: [
+        ['..#..', '.###.', '.###.', '#####', '#.#.#'],
+        ['..#..', '.###.', '.###.', '#####', '.#.#.'],
+      ],
+    },
+    hourglass: {
+      color: '#57606A',
+      fps: 1.5,
+      frames: [
+        ['#####', '.###.', '..#..', '.#.#.', '#####'],
+        ['#####', '.#.#.', '..#..', '.###.', '#####'],
+      ],
+    },
+    squeeze: { color: '#8250DF', rows: ['.###.', '..#..', '#####', '..#..', '.###.'] },
   };
   const BUBBLE_FOR = {
     run: 'terminal',
@@ -50,13 +124,24 @@
     search: 'magnifier',
     web: 'globe',
     delegate: 'octopus',
+    supervise: 'octopus',
     ask: 'question',
     plan: 'checklist',
     tool: 'gear',
     error: 'cross',
+    test: 'flask',
+    passed: 'check',
+    build: 'hammer',
+    commit: 'stamp',
+    push: 'arrowUp',
+    pull: 'arrowDown',
+    install: 'parcel',
+    deploy: 'rocket',
+    wait: 'hourglass',
+    compact: 'squeeze',
   };
-  const LAPTOP = new Set(['run', 'write', 'web', 'tool']);
-  const BOOK = new Set(['read', 'search']);
+  const LAPTOP = new Set(['run', 'write', 'web', 'tool', 'test', 'build', 'commit', 'push', 'pull', 'install', 'deploy']);
+  const READING = new Set(['read', 'search']);
 
   let W = 0;
   let H = 0;
@@ -82,14 +167,90 @@
     return weighted[0][0];
   }
 
+  function listsVisible() {
+    return actors.some((a) => a.tasks.length > 0) || latestAgents.some((a) => a.tasks && a.tasks.length > 0);
+  }
+
+  function slotCells() {
+    return listsVisible() ? SLOT_W_WITH_LIST : SLOT_W;
+  }
+
+  function contentCells() {
+    return listsVisible() ? LIST_X + LIST_W : GW;
+  }
+
   function layoutFor(n) {
+    const cells = slotCells();
     for (const s of SCALES) {
-      const cols = Math.floor(W / (SLOT_W * s));
-      const rows = Math.floor(H / (SLOT_H * s));
+      const cols = Math.floor(W / (cells * s));
+      const rows = Math.floor((H - 4 - s) / (SLOT_H * s));
       if (cols >= 1 && rows >= 1 && cols * rows >= n) return { s, cols, rows };
     }
     const s = SCALES[SCALES.length - 1];
-    return { s, cols: Math.max(1, Math.floor(W / (SLOT_W * s))), rows: Math.max(1, Math.floor(H / (SLOT_H * s))) };
+    return { s, cols: Math.max(1, Math.floor(W / (cells * s))), rows: Math.max(1, Math.floor((H - 4 - s) / (SLOT_H * s))) };
+  }
+
+  function parentActor(a) {
+    return a.parentAgentId ? actors.find((x) => x !== a && x.agentId === a.parentAgentId) : null;
+  }
+
+  /** Breadth-first levels of the management tree, orchestrators first. */
+  function buildLevels() {
+    const children = new Map();
+    const roots = [];
+    for (const a of actors) {
+      const parent = parentActor(a);
+      if (!parent) {
+        roots.push(a);
+      } else {
+        if (!children.has(parent)) children.set(parent, []);
+        children.get(parent).push(a);
+      }
+    }
+    for (const a of actors) a.boss = children.has(a) || (a.boss && a.mode === 'celebrate');
+
+    const levels = [];
+    let current = roots;
+    while (current.length && levels.length < 8) {
+      levels.push(current);
+      current = current.flatMap((a) => children.get(a) || []);
+    }
+    return levels;
+  }
+
+  function wrapLevels(levels, cols) {
+    const rows = [];
+    for (const level of levels) {
+      for (let i = 0; i < level.length; i += cols) rows.push(level.slice(i, i + cols));
+    }
+    return rows;
+  }
+
+  function placeRows(rows, s) {
+    const slotW = slotCells() * s;
+    const slotH = SLOT_H * s;
+    const inset = (slotW - contentCells() * s) / 2;
+    rows.forEach((row, r) => {
+      const startX = (W - row.length * slotW) / 2;
+      row.forEach((a, col) => {
+        a.tx = Math.round(startX + col * slotW + inset);
+        a.ty = groundY(s) - (rows.length - 1 - r) * slotH;
+      });
+    });
+  }
+
+  function layoutTree(levels) {
+    const cells = slotCells();
+    let chosen = null;
+    for (const s of SCALES) {
+      const cols = Math.floor(W / (cells * s));
+      if (cols < 1) continue;
+      chosen = { s, rows: wrapLevels(levels, cols) };
+      if (chosen.rows.length * SLOT_H * s + s + 4 <= H) break;
+    }
+    if (!chosen) chosen = { s: SCALES[SCALES.length - 1], rows: wrapLevels(levels, 1) };
+    scale = chosen.s;
+    placeRows(chosen.rows, chosen.s);
   }
 
   function capacity() {
@@ -106,11 +267,15 @@
   }
 
   function relayout() {
+    const levels = buildLevels();
+    if (levels.length > 1) {
+      layoutTree(levels);
+      return;
+    }
+
     const n = Math.max(actors.length, 1);
     const { s, cols } = layoutFor(n);
     scale = s;
-    const slotW = SLOT_W * s;
-    const slotH = SLOT_H * s;
 
     if (actors.length === 1 && actors[0].mode === 'idle') {
       const a = actors[0];
@@ -118,14 +283,9 @@
       a.ty = groundY(s);
       return;
     }
-    actors.forEach((a, i) => {
-      const row = Math.floor(i / cols);
-      const inRow = Math.min(cols, actors.length - row * cols);
-      const col = i - row * cols;
-      const startX = (W - inRow * slotW) / 2;
-      a.tx = Math.round(startX + col * slotW + (slotW - GW * s) / 2);
-      a.ty = groundY(s) - row * slotH;
-    });
+    const rows = [];
+    for (let i = 0; i < actors.length; i += cols) rows.unshift(actors.slice(i, i + cols));
+    placeRows(rows, s);
   }
 
   function setMode(a, mode, activity) {
@@ -134,6 +294,9 @@
     if (activity) a.activity = activity;
     if (mode === 'idle') {
       a.idleSince = time;
+      a.tasks = [];
+      a.boss = false;
+      a.parentAgentId = null;
       startBehavior(a, 'rest', rand(1, 3));
     }
   }
@@ -167,7 +330,14 @@
       step: 0,
       bubbleSide: 1,
       thinkVariant: 0,
+      parentAgentId: null,
+      boss: false,
+      tasks: [],
+      glanceUntil: -Infinity,
+      nextGlance: time + rand(1, 3),
       bubbleAt: -Infinity,
+      squeezeAt: -Infinity,
+      squeezeReleased: true,
     };
     actors.push(a);
     return a;
@@ -216,7 +386,7 @@
       vy: rand(-45, -25) * (scale / 3),
       gravity: 0,
       life: rand(0.4, 0.8),
-      color: Math.random() < 0.5 ? '#58A6FF' : C.check,
+      color: a.activity === 'build' ? '#E3A008' : Math.random() < 0.5 ? '#58A6FF' : C.check,
       size: Math.max(1, scale - 2),
     });
   }
@@ -254,9 +424,49 @@
         puff(actor);
       }
       actor.agentId = agent.id;
+      actor.parentAgentId = agent.parentId;
       actor.step = agent.step;
+      syncTasks(actor, agent.tasks || []);
       setMode(actor, 'work', agent.activity);
     }
+  }
+
+  function listRowY(row) {
+    return LIST_TOP + row * LIST_PITCH;
+  }
+
+  /** The visible rows always include the task in progress. */
+  function listWindow(tasks) {
+    let current = tasks.indexOf('in_progress');
+    if (current < 0) current = tasks.indexOf('pending');
+    if (current < 0) current = tasks.length - 1;
+    const start = Math.max(0, Math.min(current - 1, tasks.length - LIST_ROWS));
+    return { current, start };
+  }
+
+  function syncTasks(a, tasks) {
+    const changed = tasks.length !== a.tasks.length || tasks.some((t, i) => t !== a.tasks[i]);
+    if (!changed) return;
+    const { start } = listWindow(tasks);
+    tasks.forEach((status, i) => {
+      const row = i - start;
+      if (status !== 'completed' || a.tasks[i] === undefined || a.tasks[i] === 'completed') return;
+      if (row < 0 || row >= LIST_ROWS) return;
+      for (let n = 0; n < 5; n++) {
+        particles.push({
+          x: a.x + (LIST_X + 1) * scale,
+          y: a.y + listRowY(row) * scale,
+          vx: rand(-40, 40),
+          vy: rand(-70, -20),
+          gravity: 180,
+          life: rand(0.3, 0.6),
+          color: LIST.done,
+          size: Math.max(1, scale - 1),
+        });
+      }
+    });
+    a.tasks = tasks;
+    a.glanceUntil = time + 1.4;
   }
 
   function nextBubble(a) {
@@ -265,7 +475,20 @@
     a.bubbleAt = time;
   }
 
-  function reconcile(agents, completed) {
+  function startSqueeze(a) {
+    a.squeezeAt = time;
+    a.squeezeReleased = false;
+  }
+
+  function isSqueezing(a) {
+    return a.mode !== 'celebrate' && time - a.squeezeAt < SQUEEZE_S;
+  }
+
+  function isPressed(a) {
+    return isSqueezing(a) && time - a.squeezeAt < SQUEEZE_S * SQUEEZE_RELEASE;
+  }
+
+  function reconcile(agents, completed, compacted) {
     latestAgents = agents;
     const byId = new Map(agents.map((a) => [a.id, a]));
 
@@ -274,6 +497,8 @@
       const agent = byId.get(a.agentId);
       if (agent) {
         a.activity = agent.activity;
+        a.parentAgentId = agent.parentId;
+        syncTasks(a, agent.tasks || []);
         if (agent.step !== a.step) {
           a.step = agent.step;
           nextBubble(a);
@@ -289,6 +514,12 @@
     assignAgents();
     if (actors.length === 0) createActor(maxX(), groundY(scale));
     relayout();
+
+    // A manual compaction happens in a resting session, which has no octopus of its own.
+    for (const id of compacted || []) {
+      const actor = actors.find((a) => a.agentId === id) || actors.find((a) => !a.agentId && a.mode === 'idle');
+      if (actor) startSqueeze(actor);
+    }
   }
 
   function updateIdle(a) {
@@ -329,6 +560,18 @@
         if (time - a.modeStart >= CELEBRATE_S) retire(a);
       }
       if (a.mode === 'work' && LAPTOP.has(a.activity) && Math.random() < 0.3) bits(a);
+      if (a.mode === 'work' && a.activity === 'deploy' && time - a.lastConfetti > 0.8) {
+        a.lastConfetti = time;
+        confetti(a);
+      }
+      if (!a.squeezeReleased && time - a.squeezeAt >= SQUEEZE_S * SQUEEZE_RELEASE) {
+        a.squeezeReleased = true;
+        puff(a);
+      }
+      if (a.mode === 'work' && a.tasks.length && time >= a.nextGlance) {
+        a.glanceUntil = time + 1.1;
+        a.nextGlance = time + rand(3.5, 7);
+      }
 
       const speed = (a.mode === 'idle' ? 7 : 26) * scale * dt;
       const dx = a.tx - a.x;
@@ -353,10 +596,31 @@
     });
   }
 
+  function isGlancing(a) {
+    return a.mode === 'work' && a.tasks.length > 0 && time < a.glanceUntil;
+  }
+
   function pose(a) {
     const p = basePose(a);
     const sincePoke = time - a.pokedAt;
     if (sincePoke < 0.4) p.lift += Math.round(Math.sin((sincePoke / 0.4) * Math.PI) * 4);
+    if (isSqueezing(a)) {
+      const since = time - a.squeezeAt;
+      const release = SQUEEZE_S * SQUEEZE_RELEASE;
+      if (since < release) {
+        p.press = Math.floor(since * 5) % 2 ? 2 : 3;
+        p.eyes = 'closed';
+        p.armL = 1;
+        p.armR = 1;
+      } else {
+        p.lift += Math.round(Math.sin(((since - release) / (SQUEEZE_S - release)) * Math.PI) * 3);
+        p.eyes = 'happy';
+      }
+    }
+    if (isGlancing(a)) {
+      p.look = 1;
+      if (p.eyes !== 'closed') p.eyes = 'open';
+    }
     return p;
   }
 
@@ -377,10 +641,24 @@
     if (a.mode === 'work') {
       const frame = Math.floor(time * 8 + a.seq);
       p.squash = Math.floor(time * 3 + a.seq) % 2;
-      if (LAPTOP.has(a.activity)) {
+      if (a.activity === 'build') {
+        p.armL = frame % 2 ? -2 : 1;
+        p.armR = frame % 2 ? 1 : -2;
+      } else if (LAPTOP.has(a.activity)) {
         p.armL = frame % 2 ? 1 : 0;
         p.armR = frame % 2 ? 0 : 1;
-      } else if (BOOK.has(a.activity)) {
+      } else if (a.activity === 'passed') {
+        p.squash = 0;
+        p.lift = Math.round(Math.abs(Math.sin(time * Math.PI * 2)) * 3);
+        p.eyes = 'happy';
+        p.armL = -4;
+        p.armR = -4;
+      } else if (a.activity === 'wait') {
+        p.squash = 1;
+        p.armL = 1;
+        p.armR = Math.floor(time * 2 + a.seq) % 2;
+        p.eyes = blink ? 'closed' : 'up';
+      } else if (READING.has(a.activity)) {
         p.armL = 1;
         p.armR = 1;
         p.look = Math.round(Math.sin(time * 2.5 + a.seq));
@@ -389,6 +667,8 @@
         p.armR = -1;
         p.squash = 0;
         p.shake = frame % 2 ? 1 : -1;
+      } else if (a.activity === 'delegate' || a.activity === 'supervise') {
+        p.eyes = blink ? 'closed' : 'down';
       } else if (a.activity === 'ask') {
         p.armR = Math.floor(time * 4) % 2 ? -5 : -4;
       } else {
@@ -448,7 +728,9 @@
       return;
     }
     if (a.mode === 'idle') {
-      if (a.behavior === 'sleep') {
+      if (isPressed(a)) {
+        drawBubble(a, R);
+      } else if (a.behavior === 'sleep') {
         const phase = (time * 0.7) % 1;
         drawZ(R, 11, -2 - Math.floor(phase * 2), C.outline);
         if (phase > 0.5) drawZ(R, 8, -5 - Math.floor(phase * 2), C.outline);
@@ -459,13 +741,6 @@
       R(4, 5, 7, 3, C.metal);
       R(6, 6, 3, 1, C.metalLight);
       R(3, 8, 9, 1, C.metalLight);
-    } else if (BOOK.has(a.activity)) {
-      const flip = Math.floor(time / 1.8 + a.seq) % 3 === 0 && (time / 1.8 + a.seq) % 1 < 0.2;
-      R(3, 5 + q, 4, 3, C.page);
-      R(8, 5 + q, 4, 3, flip ? C.ink : C.page);
-      R(7, 5 + q, 1, 3, C.spine);
-      R(4, 6 + q, 2, 1, C.ink);
-      if (!flip) R(9, 6 + q, 2, 1, C.ink);
     }
     drawBubble(a, R);
   }
@@ -473,28 +748,88 @@
   function drawBubble(a, R) {
     const left = a.bubbleSide > 0 ? 6 : 0;
     const top = -9 + (time - a.bubbleAt < 0.17 ? 1 : 0);
-    const border = a.activity === 'error' ? GLYPHS.cross.color : C.outline;
+    const kind = isPressed(a) ? 'compact' : a.activity;
+    const border = kind === 'error' ? GLYPHS.cross.color : kind === 'passed' ? GLYPHS.check.color : C.outline;
     R(left, top, 9, 7, border);
     R(left + 1, top + 1, 7, 5, C.bubble);
     R(a.bubbleSide > 0 ? left + 2 : left + 6, top + 7, 1, 1, border);
 
-    if (a.activity === 'think' && !a.thinkVariant) {
+    if (kind === 'think' && !a.thinkVariant) {
       const dot = Math.floor(time * 3 + a.seq) % 3;
       for (let i = 0; i < 3; i++) R(left + 2 + i * 2, top + 3 - (i === dot ? 1 : 0), 1, 1, C.eye);
       return;
     }
-    const glyph = GLYPHS[a.activity === 'think' ? 'bulb' : BUBBLE_FOR[a.activity] || 'gear'];
-    const x0 = left + 1 + Math.floor((7 - glyph.rows[0].length) / 2);
-    glyph.rows.forEach((row, y) => {
+    const glyph = GLYPHS[kind === 'think' ? 'bulb' : BUBBLE_FOR[kind] || 'gear'];
+    const rows = glyph.frames ? glyph.frames[Math.floor(time * glyph.fps + a.seq) % glyph.frames.length] : glyph.rows;
+    const x0 = left + 1 + Math.floor((7 - rows[0].length) / 2);
+    rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
         if (row[x] === '#') R(x0 + x, top + 1 + y, 1, 1, glyph.color);
       }
     });
   }
 
+  function drawList(a, R) {
+    if (a.tasks.length === 0) return;
+    const { current, start } = listWindow(a.tasks);
+    const activeColor = Math.floor(time * 4 + a.seq) % 2 === 0 ? LIST.active : LIST.activeDim;
+
+    a.tasks.slice(start, start + LIST_ROWS).forEach((status, i) => {
+      const color = status === 'completed' ? LIST.done : status === 'in_progress' ? activeColor : LIST.pending;
+      R(LIST_X, listRowY(i), 2, 2, color);
+    });
+
+    if (isGlancing(a)) R(LIST_X - 1, listRowY(Math.max(0, current - start)), 1, 1, C.scan);
+  }
+
+  function linkPoints(child, parent) {
+    const s = scale;
+    const x1 = Math.round(parent.x) + 7 * s;
+    const y1 = Math.round(parent.y) + (GH + 1) * s;
+    const bus = y1 + s;
+    // Drop on the side away from the speech bubble so the line stays visible.
+    const x2 = Math.round(child.x) + (child.bubbleSide > 0 ? 3 : 11) * s;
+    const y2 = Math.round(child.y);
+    return [[x1, y1], [x1, bus], [x2, bus], [x2, y2]];
+  }
+
+  function drawLinks() {
+    const thick = Math.max(2, Math.floor(scale * 0.6));
+    for (const a of actors) {
+      const parent = parentActor(a);
+      if (!parent) continue;
+      const pts = linkPoints(a, parent);
+      ctx.fillStyle = C.link;
+      let length = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i];
+        const [bx, by] = pts[i + 1];
+        ctx.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax) + thick, Math.abs(by - ay) + thick);
+        length += Math.abs(bx - ax) + Math.abs(by - ay);
+      }
+      if (a.mode !== 'work' || length === 0) continue;
+
+      // A signal travels from the orchestrator down to the worker.
+      let travelled = (time * 30 * scale + a.seq * 37) % length;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i];
+        const [bx, by] = pts[i + 1];
+        const segment = Math.abs(bx - ax) + Math.abs(by - ay);
+        if (travelled <= segment) {
+          const f = segment ? travelled / segment : 0;
+          ctx.fillStyle = C.signal;
+          ctx.fillRect(Math.round(ax + (bx - ax) * f), Math.round(ay + (by - ay) * f), thick, thick);
+          break;
+        }
+        travelled -= segment;
+      }
+    }
+  }
+
   function drawActor(a) {
     const s = scale;
     const p = pose(a);
+    const bodyColor = a.boss ? C.boss : C.body;
     const px = Math.round(a.x) + (p.shake || 0) * s;
     const py = Math.round(a.y);
     const R0 = (x, y, w, h, c) => {
@@ -502,27 +837,38 @@
       ctx.fillRect(px + x * s, py + y * s, w * s, h * s);
     };
     const R = (x, y, w, h, c) => R0(x, y - p.lift, w, h, c);
-    const q = p.squash;
+    const press = p.press || 0;
+    const q = p.squash + press;
+    const wide = press >= 2 ? 1 : 0;
 
     R0(2, GH, 11, 1, C.shadow);
 
     const walkFrame = a.moving ? Math.floor(time * 10) % 2 : -1;
     [3, 5, 9, 11].forEach((x, i) => {
       const short = i % 2 === walkFrame ? 1 : 0;
-      R(x, 7 + q, 1, 2 - q - short, C.body);
+      R(x, 7 + p.squash, 1, 2 - p.squash - short, bodyColor);
     });
 
-    R(2, q, 11, 7, C.body);
+    R(2 - wide, q, 11 + 2 * wide, 7 - press, bodyColor);
     const drawArm = (handX, shoulderX, offset) => {
-      R(handX, 3 + q + offset, 2, 2, C.body);
-      if (offset < -3) R(shoulderX, 5 + q + offset, 1, -offset - 1, C.body);
+      R(handX, 3 + q + offset, 2, 2, bodyColor);
+      if (offset < -3) R(shoulderX, 5 + q + offset, 1, -offset - 1, bodyColor);
     };
     drawArm(0, 1, p.armL);
     drawArm(13, 13, p.armR);
 
+    if (a.mode === 'work' && READING.has(a.activity)) {
+      R(3, 1 + q, 3, 4, C.lens);
+      R(9, 1 + q, 3, 4, C.lens);
+      R(6, 2 + q, 3, 1, C.metal);
+      R(2, 2 + q, 1, 1, C.metal);
+      R(12, 2 + q, 1, 1, C.metal);
+    }
+
     for (const ex of [4 + p.look, 10 + p.look]) {
       if (p.eyes === 'closed') R(ex, 3 + q, 1, 1, C.eye);
       else if (p.eyes === 'up') R(ex, 1 + q, 1, 2, C.eye);
+      else if (p.eyes === 'down') R(ex, 3 + q, 1, 2, C.eye);
       else if (p.eyes === 'happy') {
         R(ex - 1, 3 + q, 1, 1, C.eye);
         R(ex, 2 + q, 1, 1, C.eye);
@@ -531,10 +877,12 @@
     }
 
     drawProp(a, a.mode === 'celebrate' ? R : R0, q);
+    drawList(a, R0);
   }
 
   function render() {
     ctx.clearRect(0, 0, W, H);
+    drawLinks();
     actors.slice().sort((a, b) => a.y - b.y).forEach(drawActor);
     for (const p of particles) {
       ctx.fillStyle = p.color;
@@ -567,7 +915,7 @@
 
   window.addEventListener('message', (event) => {
     const m = event.data;
-    if (m && m.type === 'agents') reconcile(m.agents, m.completed);
+    if (m && m.type === 'agents') reconcile(m.agents, m.completed, m.compacted);
   });
 
   function actorAt(x, y) {

@@ -28,7 +28,7 @@ function makeFilter() {
 class PolipettoView {
   constructor(context) {
     this.context = context;
-    this.view = null;
+    this.views = new Set();
     this.tracker = null;
     this.timer = null;
     this.restart();
@@ -58,23 +58,23 @@ class PolipettoView {
   }
 
   post(snapshot) {
-    if (this.view) this.view.webview.postMessage({ type: 'agents', ...snapshot });
+    for (const view of this.views) view.webview.postMessage({ type: 'agents', ...snapshot });
   }
 
   resolveWebviewView(view) {
-    this.view = view;
+    this.views.add(view);
     const media = vscode.Uri.joinPath(this.context.extensionUri, 'media');
     view.webview.options = { enableScripts: true, localResourceRoots: [media] };
     view.webview.onDidReceiveMessage((m) => {
       if (!m) return;
       if (m.type === 'ready') {
-        this.post({ agents: this.tracker.snapshot(), completed: [] });
+        view.webview.postMessage({ type: 'agents', agents: this.tracker.snapshot(), completed: [] });
       } else if (m.type === 'newSession') {
         this.newSession();
       }
     });
     view.onDidDispose(() => {
-      this.view = null;
+      this.views.delete(view);
     });
     view.webview.html = this.html(view.webview, media);
   }
@@ -101,10 +101,13 @@ class PolipettoView {
 
 function activate(context) {
   const provider = new PolipettoView(context);
+  const viewIds = Object.values(context.extension.packageJSON.contributes.views).flat().map((v) => v.id);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('polipetto.view', provider, {
-      webviewOptions: { retainContextWhenHidden: true },
-    }),
+    ...viewIds.map((id) =>
+      vscode.window.registerWebviewViewProvider(id, provider, {
+        webviewOptions: { retainContextWhenHidden: true },
+      })
+    ),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('polipetto.scope')) provider.restart();
     }),

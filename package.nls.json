@@ -2,5 +2,9 @@
   "description": "A pixel-art octopus in the sidebar that acts out what Claude Code is doing, one per agent. Unofficial, not affiliated with Anthropic.",
   "config.scope.description": "Which Claude Code sessions make the octopus move.",
   "config.scope.all": "React to every Claude Code session on this computer.",
-  "config.scope.workspace": "React only to sessions started in the folders open in this window."
+  "config.scope.workspace": "React only to sessions started in the folders open in this window.",
+  "config.showInExplorer": "Show the octopus in the Explorer sidebar.",
+  "config.showInSourceControl": "Show the octopus in the Source Control sidebar.",
+  "config.showInRunAndDebug": "Show the octopus in the Run and Debug sidebar.",
+  "config.showInTesting": "Show the octopus in the Testing sidebar."
 }

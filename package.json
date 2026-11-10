@@ -2,7 +2,7 @@
   "name": "polipetto-claude",
   "displayName": "Polipetto per Claude Code",
   "description": "%description%",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "publisher": "aebwp",
   "license": "MIT",
   "pricing": "Free",
@@ -44,7 +44,36 @@
         {
           "type": "webview",
           "id": "polipetto.view",
-          "name": "Claude Worker"
+          "name": "Claude Worker",
+          "contextualTitle": "Claude Worker",
+          "when": "config.polipetto.showInExplorer"
+        }
+      ],
+      "scm": [
+        {
+          "type": "webview",
+          "id": "polipetto.view.scm",
+          "name": "Claude Worker",
+          "contextualTitle": "Claude Worker",
+          "when": "config.polipetto.showInSourceControl"
+        }
+      ],
+      "debug": [
+        {
+          "type": "webview",
+          "id": "polipetto.view.debug",
+          "name": "Claude Worker",
+          "contextualTitle": "Claude Worker",
+          "when": "config.polipetto.showInRunAndDebug"
+        }
+      ],
+      "test": [
+        {
+          "type": "webview",
+          "id": "polipetto.view.test",
+          "name": "Claude Worker",
+          "contextualTitle": "Claude Worker",
+          "when": "config.polipetto.showInTesting"
         }
       ]
     },
@@ -63,6 +92,26 @@
           ],
           "default": "all",
           "description": "%config.scope.description%"
+        },
+        "polipetto.showInExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showInExplorer%"
+        },
+        "polipetto.showInSourceControl": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showInSourceControl%"
+        },
+        "polipetto.showInRunAndDebug": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showInRunAndDebug%"
+        },
+        "polipetto.showInTesting": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showInTesting%"
         }
       }
     }
