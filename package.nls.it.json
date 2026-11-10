@@ -1,0 +1,6 @@
+{
+  "description": "Un polipetto in pixel art nella sidebar che mette in scena quello che sta facendo Claude Code, uno per agente. Non ufficiale, non affiliato ad Anthropic.",
+  "config.scope.description": "Quali sessioni di Claude Code fanno muovere il polipetto.",
+  "config.scope.all": "Reagisce a tutte le sessioni di Claude Code su questo computer.",
+  "config.scope.workspace": "Reagisce solo alle sessioni avviate nelle cartelle aperte in questa finestra."
+}

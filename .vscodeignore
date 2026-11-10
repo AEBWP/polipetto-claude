@@ -1,4 +1,6 @@
 test/**
 .vscode/**
+.github/**
 .gitignore
+media/preview.png
 *.vsix

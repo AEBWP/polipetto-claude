@@ -16,15 +16,43 @@ const DEFAULTS = {
   maxReadBytes: 16 * 1024 * 1024,
 };
 
-const READ_TOOLS = new Set([
-  'Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'ToolSearch', 'NotebookRead',
-]);
-const THINK_TOOLS = new Set(['Agent', 'Task', 'Workflow', 'SendMessage', 'AskUserQuestion']);
+const TOOL_ACTIVITY = {
+  Bash: 'run',
+  PowerShell: 'run',
+  BashOutput: 'run',
+  KillShell: 'run',
+  Monitor: 'run',
+  TaskStop: 'run',
+  Edit: 'write',
+  MultiEdit: 'write',
+  Write: 'write',
+  NotebookEdit: 'write',
+  Read: 'read',
+  NotebookRead: 'read',
+  LS: 'read',
+  Grep: 'search',
+  Glob: 'search',
+  ToolSearch: 'search',
+  SearchPlugins: 'search',
+  WebFetch: 'web',
+  WebSearch: 'web',
+  Agent: 'delegate',
+  Task: 'delegate',
+  Workflow: 'delegate',
+  SendMessage: 'delegate',
+  SubagentHandback: 'delegate',
+  AskUserQuestion: 'ask',
+  ExitPlanMode: 'ask',
+  TodoWrite: 'plan',
+  TaskCreate: 'plan',
+  TaskUpdate: 'plan',
+  TaskList: 'plan',
+  EnterPlanMode: 'plan',
+};
 
 function activityForTool(name) {
-  if (READ_TOOLS.has(name)) return 'read';
-  if (THINK_TOOLS.has(name)) return 'think';
-  return 'type';
+  if (name.startsWith('mcp__') && /browser|chrome/i.test(name)) return 'web';
+  return TOOL_ACTIVITY[name] || 'tool';
 }
 
 function textOf(content) {
@@ -35,6 +63,7 @@ function textOf(content) {
 
 /** Maps one transcript record to null, {kind:'work',activity}, {kind:'end'} or {kind:'abort'}. */
 function classify(rec) {
+  if (rec && rec.type === 'system' && rec.subtype === 'api_error') return { kind: 'work', activity: 'error' };
   if (!rec || !rec.message) return null;
   const content = rec.message.content;
 
@@ -44,7 +73,8 @@ function classify(rec) {
     if (text.includes('[Request interrupted by user')) return { kind: 'abort' };
     // Local slash commands and "!" shell lines are logged as user text but never reach the model.
     if (/^\s*<(command-|local-command|bash-)/.test(text)) return null;
-    return { kind: 'work', activity: 'think' };
+    const failed = Array.isArray(content) && content.some((b) => b && b.type === 'tool_result' && b.is_error);
+    return { kind: 'work', activity: failed ? 'error' : 'think' };
   }
 
   if (rec.type === 'assistant') {

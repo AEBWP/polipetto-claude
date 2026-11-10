@@ -1,21 +1,42 @@
 {
   "name": "polipetto-claude",
   "displayName": "Polipetto per Claude Code",
-  "description": "Un polipetto nella sidebar che reagisce al lavoro di Claude Code: uno per agente.",
-  "version": "0.4.0",
-  "publisher": "alessio-local",
+  "description": "%description%",
+  "version": "0.5.0",
+  "publisher": "aebwp",
+  "license": "MIT",
+  "pricing": "Free",
   "icon": "media/icon.png",
-  "private": true,
+  "galleryBanner": {
+    "color": "#1F2428",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AEBWP/polipetto-claude.git"
+  },
+  "homepage": "https://github.com/AEBWP/polipetto-claude#readme",
+  "bugs": {
+    "url": "https://github.com/AEBWP/polipetto-claude/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude code",
+    "mascot",
+    "pet",
+    "pixel art"
+  ],
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
   ],
+  "l10n": "./l10n",
   "main": "./src/extension.js",
   "scripts": {
     "test": "node --test",
-    "package": "npx --yes @vscode/vsce package --allow-missing-repository --skip-license"
+    "package": "npx --yes @vscode/vsce package"
   },
   "contributes": {
     "views": {
@@ -37,11 +58,11 @@
             "workspace"
           ],
           "enumDescriptions": [
-            "Reagisce a tutte le sessioni di Claude Code su questo computer.",
-            "Reagisce solo alle sessioni avviate nelle cartelle aperte in questa finestra."
+            "%config.scope.all%",
+            "%config.scope.workspace%"
           ],
           "default": "all",
-          "description": "Quali sessioni di Claude Code fanno muovere il polipetto."
+          "description": "%config.scope.description%"
         }
       }
     }

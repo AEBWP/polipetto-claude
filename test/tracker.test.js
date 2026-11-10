@@ -60,11 +60,33 @@ test('classify ignores local commands and meta records', () => {
 });
 
 test('classify maps tools to activities', () => {
-  assert.strictEqual(classify(tool('Grep')).activity, 'read');
-  assert.strictEqual(classify(tool('Edit')).activity, 'type');
-  assert.strictEqual(classify(tool('Bash')).activity, 'type');
-  assert.strictEqual(classify(tool('Agent')).activity, 'think');
+  const expected = {
+    Bash: 'run',
+    PowerShell: 'run',
+    Edit: 'write',
+    Write: 'write',
+    Read: 'read',
+    Grep: 'search',
+    Glob: 'search',
+    WebSearch: 'web',
+    mcp__Claude_Browser__navigate: 'web',
+    Agent: 'delegate',
+    AskUserQuestion: 'ask',
+    TodoWrite: 'plan',
+    mcp__github__list_issues: 'tool',
+  };
+  for (const [name, activity] of Object.entries(expected)) {
+    assert.strictEqual(classify(tool(name)).activity, activity, name);
+  }
   assert.strictEqual(classify(user('[Request interrupted by user]')).kind, 'abort');
+});
+
+test('classify reports failed tools and API errors', () => {
+  const failed = { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', is_error: true, content: 'Exit code 1' }] } };
+  assert.deepStrictEqual(classify(failed), { kind: 'work', activity: 'error' });
+  assert.deepStrictEqual(classify({ type: 'system', subtype: 'api_error' }), { kind: 'work', activity: 'error' });
+  assert.strictEqual(classify(toolResult()).activity, 'think');
+  assert.strictEqual(classify({ type: 'system', subtype: 'stop_hook_summary' }), null);
 });
 
 test('a turn goes working, follows tools, then completes once', async (t) => {
@@ -118,7 +140,7 @@ test('a second message block during debounce cancels completion', async (t) => {
   s.advance(2000);
   await s.tracker.tick();
   assert.deepStrictEqual(s.last().completed, []);
-  assert.strictEqual(s.last().agents[0].activity, 'type');
+  assert.strictEqual(s.last().agents[0].activity, 'write');
 });
 
 test('subagents appear one per agent and complete independently', async (t) => {
@@ -172,7 +194,7 @@ test('a session already working at startup is picked up', async (t) => {
   t.after(s.cleanup);
   s.write(s.file, user('running'), tool('Grep'));
   await s.tracker.tick();
-  assert.strictEqual(s.last().agents[0].activity, 'read');
+  assert.strictEqual(s.last().agents[0].activity, 'search');
   assert.deepStrictEqual(s.last().completed, []);
 });
 

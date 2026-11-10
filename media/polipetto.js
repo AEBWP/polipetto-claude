@@ -32,13 +32,31 @@
 
   const GLYPHS = {
     bulb: { color: '#E3A008', rows: ['.###.', '#####', '.###.', '..#..', '.###.'] },
-    question: { color: '#2F81F7', rows: ['.###.', '#...#', '..##.', '.....', '..#..'] },
-    bang: { color: '#D97757', rows: ['..#..', '..#..', '..#..', '.....', '..#..'] },
-    code: { color: '#238636', rows: ['..#.#..', '.#...#.', '#.....#', '.#...#.', '..#.#..'] },
-    spark: { color: '#BF3989', rows: ['..#..', '#.#.#', '.###.', '#.#.#', '..#..'] },
+    terminal: { color: '#238636', rows: ['#......', '.#.....', '..#....', '.#.....', '#...###'] },
+    pencil: { color: '#B35900', rows: ['.....##', '....###', '...##..', '..##...', '###....'] },
+    page: { color: '#57606A', rows: ['#####', '.....', '#####', '.....', '###..'] },
+    magnifier: { color: '#2F81F7', rows: ['.###...', '#...#..', '#...#..', '.###.#.', '......#'] },
+    globe: { color: '#0969DA', rows: ['.###.', '#.#.#', '#####', '#.#.#', '.###.'] },
+    octopus: { color: '#D97757', rows: ['.#####.', '##.#.##', '#######', '.#.#.#.', '.#.#.#.'] },
+    question: { color: '#8250DF', rows: ['.###.', '#...#', '..##.', '.....', '..#..'] },
+    checklist: { color: '#8250DF', rows: ['#.###', '.....', '#.###', '.....', '#.###'] },
     gear: { color: '#57606A', rows: ['#.#.#', '.###.', '##.##', '.###.', '#.#.#'] },
+    cross: { color: '#CF222E', rows: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'] },
   };
-  const BUBBLE_KINDS = ['dots', ...Object.keys(GLYPHS)];
+  const BUBBLE_FOR = {
+    run: 'terminal',
+    write: 'pencil',
+    read: 'page',
+    search: 'magnifier',
+    web: 'globe',
+    delegate: 'octopus',
+    ask: 'question',
+    plan: 'checklist',
+    tool: 'gear',
+    error: 'cross',
+  };
+  const LAPTOP = new Set(['run', 'write', 'web', 'tool']);
+  const BOOK = new Set(['read', 'search']);
 
   let W = 0;
   let H = 0;
@@ -148,7 +166,7 @@
       pokedAt: -Infinity,
       step: 0,
       bubbleSide: 1,
-      bubbleKind: 'dots',
+      thinkVariant: 0,
       bubbleAt: -Infinity,
     };
     actors.push(a);
@@ -242,8 +260,7 @@
   }
 
   function nextBubble(a) {
-    const others = BUBBLE_KINDS.filter((k) => k !== a.bubbleKind);
-    a.bubbleKind = others[Math.floor(Math.random() * others.length)];
+    a.thinkVariant = 1 - a.thinkVariant;
     a.bubbleSide = -a.bubbleSide;
     a.bubbleAt = time;
   }
@@ -311,7 +328,7 @@
         }
         if (time - a.modeStart >= CELEBRATE_S) retire(a);
       }
-      if (a.mode === 'work' && a.activity === 'type' && Math.random() < 0.3) bits(a);
+      if (a.mode === 'work' && LAPTOP.has(a.activity) && Math.random() < 0.3) bits(a);
 
       const speed = (a.mode === 'idle' ? 7 : 26) * scale * dt;
       const dx = a.tx - a.x;
@@ -360,13 +377,20 @@
     if (a.mode === 'work') {
       const frame = Math.floor(time * 8 + a.seq);
       p.squash = Math.floor(time * 3 + a.seq) % 2;
-      if (a.activity === 'type') {
+      if (LAPTOP.has(a.activity)) {
         p.armL = frame % 2 ? 1 : 0;
         p.armR = frame % 2 ? 0 : 1;
-      } else if (a.activity === 'read') {
+      } else if (BOOK.has(a.activity)) {
         p.armL = 1;
         p.armR = 1;
         p.look = Math.round(Math.sin(time * 2.5 + a.seq));
+      } else if (a.activity === 'error') {
+        p.armL = -1;
+        p.armR = -1;
+        p.squash = 0;
+        p.shake = frame % 2 ? 1 : -1;
+      } else if (a.activity === 'ask') {
+        p.armR = Math.floor(time * 4) % 2 ? -5 : -4;
       } else {
         p.look = a.bubbleSide;
         if (a.bubbleSide > 0) p.armR = -1;
@@ -431,35 +455,35 @@
       }
       return;
     }
-    if (a.activity === 'type') {
+    if (LAPTOP.has(a.activity)) {
       R(4, 5, 7, 3, C.metal);
       R(6, 6, 3, 1, C.metalLight);
       R(3, 8, 9, 1, C.metalLight);
-    } else if (a.activity === 'read') {
+    } else if (BOOK.has(a.activity)) {
       const flip = Math.floor(time / 1.8 + a.seq) % 3 === 0 && (time / 1.8 + a.seq) % 1 < 0.2;
       R(3, 5 + q, 4, 3, C.page);
       R(8, 5 + q, 4, 3, flip ? C.ink : C.page);
       R(7, 5 + q, 1, 3, C.spine);
       R(4, 6 + q, 2, 1, C.ink);
       if (!flip) R(9, 6 + q, 2, 1, C.ink);
-    } else {
-      drawBubble(a, R);
     }
+    drawBubble(a, R);
   }
 
   function drawBubble(a, R) {
     const left = a.bubbleSide > 0 ? 6 : 0;
     const top = -9 + (time - a.bubbleAt < 0.17 ? 1 : 0);
-    R(left, top, 9, 7, C.outline);
+    const border = a.activity === 'error' ? GLYPHS.cross.color : C.outline;
+    R(left, top, 9, 7, border);
     R(left + 1, top + 1, 7, 5, C.bubble);
-    R(a.bubbleSide > 0 ? left + 2 : left + 6, top + 7, 1, 1, C.outline);
+    R(a.bubbleSide > 0 ? left + 2 : left + 6, top + 7, 1, 1, border);
 
-    if (a.bubbleKind === 'dots') {
+    if (a.activity === 'think' && !a.thinkVariant) {
       const dot = Math.floor(time * 3 + a.seq) % 3;
       for (let i = 0; i < 3; i++) R(left + 2 + i * 2, top + 3 - (i === dot ? 1 : 0), 1, 1, C.eye);
       return;
     }
-    const glyph = GLYPHS[a.bubbleKind];
+    const glyph = GLYPHS[a.activity === 'think' ? 'bulb' : BUBBLE_FOR[a.activity] || 'gear'];
     const x0 = left + 1 + Math.floor((7 - glyph.rows[0].length) / 2);
     glyph.rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
@@ -470,9 +494,9 @@
 
   function drawActor(a) {
     const s = scale;
-    const px = Math.round(a.x);
-    const py = Math.round(a.y);
     const p = pose(a);
+    const px = Math.round(a.x) + (p.shake || 0) * s;
+    const py = Math.round(a.y);
     const R0 = (x, y, w, h, c) => {
       ctx.fillStyle = c;
       ctx.fillRect(px + x * s, py + y * s, w * s, h * s);

@@ -36,7 +36,7 @@ class PolipettoView {
 
   newSession() {
     vscode.commands.executeCommand('claude-vscode.editor.open').then(undefined, () => {
-      vscode.window.showWarningMessage("Polipetto: non riesco ad aprire Claude Code. L'estensione è installata?");
+      vscode.window.showWarningMessage(vscode.l10n.t('Polipetto: could not open Claude Code. Is its extension installed?'));
     });
   }
 
