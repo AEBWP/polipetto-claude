@@ -1,0 +1,49 @@
+{
+  "name": "polipetto-claude",
+  "displayName": "Polipetto per Claude Code",
+  "description": "Un polipetto nella sidebar che reagisce al lavoro di Claude Code: uno per agente.",
+  "version": "0.4.0",
+  "publisher": "alessio-local",
+  "icon": "media/icon.png",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "scripts": {
+    "test": "node --test",
+    "package": "npx --yes @vscode/vsce package --allow-missing-repository --skip-license"
+  },
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "polipetto.view",
+          "name": "Claude"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Polipetto",
+      "properties": {
+        "polipetto.scope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "workspace"
+          ],
+          "enumDescriptions": [
+            "Reagisce a tutte le sessioni di Claude Code su questo computer.",
+            "Reagisce solo alle sessioni avviate nelle cartelle aperte in questa finestra."
+          ],
+          "default": "all",
+          "description": "Quali sessioni di Claude Code fanno muovere il polipetto."
+        }
+      }
+    }
+  }
+}
