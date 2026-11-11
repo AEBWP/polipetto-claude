@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+- The octopus starts switched off, with its plug out of the socket and a cloud for Claude's server, and wakes up once the server answers.
+- If Claude's server stops answering, for example when a VPN drops, the octopus switches off again. The connection is checked every 30 seconds, every 10 seconds while off, or right away by clicking the switched-off octopus.
+- New settings: `polipetto.connectionCheck` to turn this off, and `polipetto.claudeUrl` for a custom server address.
+- Fixed the celebration, which stopped the animation after an agent finished.
+
 ## 0.6.1
 
 - When Claude has not declared its steps in advance, coloured bubbles rise at each step instead of a column of green dots.

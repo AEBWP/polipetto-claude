@@ -2,7 +2,7 @@
   "name": "polipetto-claude",
   "displayName": "Polipetto per Claude Code",
   "description": "%description%",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "publisher": "aebwp",
   "license": "MIT",
   "pricing": "Free",
@@ -92,6 +92,16 @@
           ],
           "default": "all",
           "description": "%config.scope.description%"
+        },
+        "polipetto.connectionCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.connectionCheck%"
+        },
+        "polipetto.claudeUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.claudeUrl%"
         },
         "polipetto.showInExplorer": {
           "type": "boolean",

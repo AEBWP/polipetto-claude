@@ -6,5 +6,7 @@
   "config.showInExplorer": "Show the octopus in the Explorer sidebar.",
   "config.showInSourceControl": "Show the octopus in the Source Control sidebar.",
   "config.showInRunAndDebug": "Show the octopus in the Run and Debug sidebar.",
-  "config.showInTesting": "Show the octopus in the Testing sidebar."
+  "config.showInTesting": "Show the octopus in the Testing sidebar.",
+  "config.connectionCheck": "Switch the octopus off while Claude's server cannot be reached, for example when a VPN drops. It is checked every 30 seconds, and every 10 seconds while the octopus is off.",
+  "config.claudeUrl": "Address of Claude's server to check. Leave empty to use ANTHROPIC_BASE_URL from the environment or from Claude Code's settings, otherwise https://api.anthropic.com."
 }

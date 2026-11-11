@@ -43,6 +43,7 @@
     signal: '#C9C1FF',
     scan: '#58A6FF',
   };
+  const CONFETTI = ['#D97757', '#F2C14E', '#3FB950', '#58A6FF', '#E06C9F'];
   const LIST = {
     pending: '#8B949E',
     active: '#D97757',
@@ -594,6 +595,7 @@
 
   function update(dt) {
     time += dt;
+    updateLink();
 
     for (const a of actors.slice()) {
       a.floats = a.floats.filter((f) => time - f.born < BUBBLE_LIFE_S);
@@ -888,6 +890,39 @@
     }
   }
 
+  /** Legs, body and arms; returns how far the body sank, which the eyes and props follow. */
+  function drawBody(R, p, color, walkFrame) {
+    const press = p.press || 0;
+    const q = p.squash + press;
+    const wide = press >= 2 ? 1 : 0;
+    [3, 5, 9, 11].forEach((x, i) => {
+      const short = i % 2 === walkFrame ? 1 : 0;
+      R(x, 7 + p.squash, 1, 2 - p.squash - short, color);
+    });
+    R(2 - wide, q, 11 + 2 * wide, 7 - press, color);
+    const drawArm = (handX, shoulderX, offset) => {
+      R(handX, 3 + q + offset, 2, 2, color);
+      if (offset < -3) R(shoulderX, 5 + q + offset, 1, -offset - 1, color);
+    };
+    drawArm(0, 1, p.armL);
+    drawArm(13, 13, p.armR);
+    return q;
+  }
+
+  function drawEyes(R, p, q, color) {
+    for (const ex of [4 + p.look, 10 + p.look]) {
+      if (p.eyes === 'closed') R(ex, 3 + q, 1, 1, color);
+      else if (p.eyes === 'off') R(ex - 1, 3 + q, 2, 1, color);
+      else if (p.eyes === 'up') R(ex, 1 + q, 1, 2, color);
+      else if (p.eyes === 'down') R(ex, 3 + q, 1, 2, color);
+      else if (p.eyes === 'happy') {
+        R(ex - 1, 3 + q, 1, 1, color);
+        R(ex, 2 + q, 1, 1, color);
+        R(ex + 1, 3 + q, 1, 1, color);
+      } else R(ex, 2 + q, 1, 2, color);
+    }
+  }
+
   function drawActor(a) {
     const s = scale;
     const p = pose(a);
@@ -899,25 +934,9 @@
       ctx.fillRect(px + x * s, py + y * s, w * s, h * s);
     };
     const R = (x, y, w, h, c) => R0(x, y - p.lift, w, h, c);
-    const press = p.press || 0;
-    const q = p.squash + press;
-    const wide = press >= 2 ? 1 : 0;
 
     R0(2, GH, 11, 1, C.shadow);
-
-    const walkFrame = a.moving ? Math.floor(time * 10) % 2 : -1;
-    [3, 5, 9, 11].forEach((x, i) => {
-      const short = i % 2 === walkFrame ? 1 : 0;
-      R(x, 7 + p.squash, 1, 2 - p.squash - short, bodyColor);
-    });
-
-    R(2 - wide, q, 11 + 2 * wide, 7 - press, bodyColor);
-    const drawArm = (handX, shoulderX, offset) => {
-      R(handX, 3 + q + offset, 2, 2, bodyColor);
-      if (offset < -3) R(shoulderX, 5 + q + offset, 1, -offset - 1, bodyColor);
-    };
-    drawArm(0, 1, p.armL);
-    drawArm(13, 13, p.armR);
+    const q = drawBody(R, p, bodyColor, a.moving ? Math.floor(time * 10) % 2 : -1);
 
     if (a.mode === 'work' && READING.has(a.activity)) {
       R(3, 1 + q, 3, 4, C.lens);
@@ -926,25 +945,292 @@
       R(2, 2 + q, 1, 1, C.metal);
       R(12, 2 + q, 1, 1, C.metal);
     }
-
-    for (const ex of [4 + p.look, 10 + p.look]) {
-      if (p.eyes === 'closed') R(ex, 3 + q, 1, 1, C.eye);
-      else if (p.eyes === 'up') R(ex, 1 + q, 1, 2, C.eye);
-      else if (p.eyes === 'down') R(ex, 3 + q, 1, 2, C.eye);
-      else if (p.eyes === 'happy') {
-        R(ex - 1, 3 + q, 1, 1, C.eye);
-        R(ex, 2 + q, 1, 1, C.eye);
-        R(ex + 1, 3 + q, 1, 1, C.eye);
-      } else R(ex, 2 + q, 1, 2, C.eye);
-    }
+    drawEyes(R, p, q, C.eye);
 
     drawProp(a, a.mode === 'celebrate' ? R : R0, q);
     drawList(a, R0);
     drawFloats(a, R0);
   }
 
+  /* ---------- Connection to Claude's server ---------- */
+
+  const WAKE_S = 2.4;
+  const SHUTDOWN_S = 2.4;
+  const OFF = {
+    body: '#7A7F87',
+    eye: '#2B2F35',
+    plug: '#3B3F46',
+    prong: '#C9CED6',
+    cable: '#5A5F67',
+    wall: '#9AA0A8',
+    wallLight: '#B8BEC6',
+    red: '#E5484D',
+    amber: '#F0B429',
+    packet: '#58A6FF',
+  };
+  const SCENE_W = 26; // octopus, plug, wall socket and cloud side by side
+  const SCENE_TOP = 11; // cells above the octopus taken by the cloud
+  const CLOUD = ['..###....', '.#####.#.', '#########', '#########', '.#######.'];
+  const CLOUD_X = 17;
+  const CLOUD_Y = -11;
+  const LINK_DOTS = [[13, -1], [14, -2], [15, -3], [16, -4], [17, -5]];
+  const PLUG_IN = [19, 3];
+  const PLUG_OUT = [15, 6];
+
+  // The octopus starts switched off and wakes once Claude's server has answered.
+  const link = { target: 'off', shown: 'off', known: false, checking: true, anim: null, animStart: 0 };
+
+  function onConnection(m) {
+    if (m.disabled) {
+      link.target = link.shown = 'on';
+      link.anim = null;
+      return;
+    }
+    link.checking = !!m.checking;
+    if (m.online === null || m.online === undefined) return;
+    link.known = true;
+    link.target = m.online ? 'on' : 'off';
+  }
+
+  function sceneVisible() {
+    return link.shown !== 'on' || link.anim !== null;
+  }
+
+  function updateLink() {
+    if (link.anim) {
+      const length = link.anim === 'wake' ? WAKE_S : SHUTDOWN_S;
+      if (time - link.animStart < length) return;
+      link.shown = link.anim === 'wake' ? 'on' : 'off';
+      link.anim = null;
+      if (link.shown === 'on') handOver();
+    }
+    if (link.shown !== link.target) {
+      link.anim = link.target === 'on' ? 'wake' : 'shutdown';
+      link.animStart = time;
+    }
+  }
+
+  /** The resting octopus carries on from where the switched-off one stood. */
+  function handOver() {
+    const sc = sceneLayout();
+    relayout();
+    for (const a of actors) {
+      if (a.agentId || a.mode !== 'idle') continue;
+      a.x = a.tx = Math.max(0, Math.min(sc.x, maxX()));
+      a.y = a.ty = groundY(scale);
+      a.idleSince = time;
+      startBehavior(a, 'rest', rand(1, 3));
+    }
+  }
+
+  function sceneLayout() {
+    for (const s of SCALES) {
+      if (SCENE_W * s <= W && (GH + 1 + SCENE_TOP) * s + 4 <= H) return { s, x: Math.round((W - SCENE_W * s) / 2), y: groundY(s) };
+    }
+    const s = SCALES[SCALES.length - 1];
+    return { s, x: Math.max(0, Math.round((W - SCENE_W * s) / 2)), y: groundY(s) };
+  }
+
+  function scenePhase() {
+    if (link.anim) {
+      const length = link.anim === 'wake' ? WAKE_S : SHUTDOWN_S;
+      return { id: link.anim, p: Math.min(1, (time - link.animStart) / length) };
+    }
+    return { id: !link.known || link.checking ? 'connecting' : 'offline', p: 0 };
+  }
+
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const lerp = (a, b, f) => a + (b - a) * f;
+
+  /** How the body looks, and how much of it has its colour back (0 to 1, from the bottom). */
+  function scenePose(ph) {
+    const p = ph.p;
+    const off = { fill: 0, eyes: 'off', squash: 1, press: 1, lift: 0, look: 0, armL: 2, armR: 2, shake: 0 };
+    if (ph.id === 'wake') {
+      if (p < 0.5) {
+        const rising = p > 0.3;
+        return { ...off, fill: clamp01((p - 0.1) / 0.4), squash: rising ? 0 : 1, press: rising ? 0 : 1, armL: rising ? 1 : 2, armR: rising ? 1 : 2 };
+      }
+      if (p < 0.62) return { ...off, fill: 1, eyes: 'closed', squash: 0, press: 0, armL: 0, armR: 0 };
+      const up = Math.floor(time * 8) % 2 === 0;
+      return {
+        ...off,
+        fill: 1,
+        eyes: 'happy',
+        squash: 0,
+        press: 0,
+        lift: Math.round(Math.sin(((p - 0.62) / 0.38) * Math.PI) * 3),
+        armL: up ? -5 : -4,
+        armR: up ? -4 : -5,
+      };
+    }
+    if (ph.id === 'shutdown') {
+      if (p < 0.2) return { ...off, fill: 1, eyes: 'open', squash: 0, press: 0, armL: -1, armR: -1, shake: Math.floor(time * 12) % 2 ? 1 : -1 };
+      if (p < 0.85) {
+        const f = (p - 0.2) / 0.65;
+        return { ...off, fill: 1 - f, eyes: 'closed', squash: f > 0.3 ? 1 : 0, press: f > 0.6 ? 1 : 0, armL: f > 0.5 ? 2 : 1, armR: f > 0.5 ? 2 : 1 };
+      }
+    }
+    return off;
+  }
+
+  function drawCross(R, x, y, c) {
+    R(x, y, 1, 1, c);
+    R(x + 2, y, 1, 1, c);
+    R(x + 1, y + 1, 1, 1, c);
+    R(x, y + 2, 1, 1, c);
+    R(x + 2, y + 2, 1, 1, c);
+  }
+
+  /** The power plug: lying on the floor while offline, trying to reach the socket while checking. */
+  function drawPlug(R, ph) {
+    const p = ph.p;
+    let [px, py] = PLUG_OUT;
+    let plugged = false;
+    let spark = null;
+    if (ph.id === 'connecting') {
+      const u = (time % 1.6) / 1.6;
+      const k = u < 0.45 ? u / 0.45 : u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3;
+      px = Math.round(lerp(PLUG_OUT[0], PLUG_IN[0] - 1, k));
+      py = Math.round(lerp(PLUG_OUT[1], PLUG_IN[1], k));
+    } else if (ph.id === 'wake') {
+      const f = clamp01(p / 0.1);
+      px = Math.round(lerp(PLUG_OUT[0], PLUG_IN[0], f));
+      py = Math.round(lerp(PLUG_OUT[1], PLUG_IN[1], f));
+      plugged = f >= 1;
+      if (p > 0.08 && p < 0.3) spark = OFF.amber;
+    } else if (ph.id === 'shutdown') {
+      if (p < 0.15) {
+        [px, py] = PLUG_IN;
+        plugged = true;
+      } else if (p < 0.25) {
+        const f = (p - 0.15) / 0.1;
+        px = Math.round(lerp(PLUG_IN[0], 16, f));
+        py = Math.round(lerp(PLUG_IN[1], 0, f));
+        spark = OFF.red;
+      } else if (p < 0.38) {
+        const f = (p - 0.25) / 0.13;
+        px = Math.round(lerp(16, PLUG_OUT[0], f));
+        py = Math.round(lerp(0, PLUG_OUT[1], f * f));
+      }
+    }
+
+    const cable = plugged ? OFF.plug : OFF.cable;
+    R(12, 8, Math.max(1, px - 12), 1, cable);
+    if (py + 1 < 8) R(px - 1, py + 1, 1, 7 - py, cable);
+
+    // Energy runs down the cable and into the octopus.
+    if (ph.id === 'wake' && p > 0.1 && p < 0.45) {
+      const drop = 7 - py;
+      const d = Math.floor(((p - 0.1) / 0.35) * (drop + px - 13));
+      if (d < drop) R(px - 1, py + 1 + d, 1, 1, OFF.amber);
+      else R(px - 1 - (d - drop), 8, 1, 1, OFF.amber);
+    }
+
+    R(px, py, 2, 3, OFF.plug);
+    R(px + 2, py, 1, 1, OFF.prong);
+    R(px + 2, py + 2, 1, 1, OFF.prong);
+    R(21, 0, 2, 9, OFF.wall);
+    R(21, 0, 1, 9, OFF.wallLight);
+    if (spark) {
+      const f = Math.floor(time * 14) % 2;
+      R(20, f ? 1 : 0, 1, 1, spark);
+      R(20, f ? 5 : 6, 1, 1, spark);
+      R(19 - f, 3 - f, 1, 1, spark);
+    }
+  }
+
+  /** Claude's server as a little cloud, joined to the octopus by a dotted line. */
+  function drawCloud(R, ph) {
+    const p = ph.p;
+    let color = C.outline;
+    let broken = true;
+    let cross = false;
+    let packet = -1;
+    let waiting = false;
+    if (ph.id === 'connecting') {
+      const u = (time % 1.4) / 1.4;
+      packet = u < 0.6 ? Math.floor((u / 0.6) * 3) : -1; // it gets lost halfway
+      waiting = true;
+    } else if (ph.id === 'offline') {
+      cross = true;
+    } else if (ph.id === 'wake') {
+      broken = false;
+      if (p < 0.2) packet = Math.min(4, Math.floor((p / 0.2) * 5));
+      else color = C.body;
+    } else if (ph.id === 'shutdown') {
+      if (p < 0.25) {
+        color = C.body;
+        broken = false;
+      }
+      cross = p > 0.35;
+    }
+
+    const alpha = ctx.globalAlpha;
+    LINK_DOTS.forEach(([x, y], i) => {
+      if (broken && i === 2) return;
+      ctx.globalAlpha = alpha * (broken ? 0.55 : 1);
+      R(x, y, 1, 1, color);
+    });
+    ctx.globalAlpha = alpha;
+    if (packet >= 0) R(LINK_DOTS[packet][0], LINK_DOTS[packet][1], 1, 1, OFF.packet);
+    CLOUD.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) if (row[x] === '#') R(CLOUD_X + x, CLOUD_Y + y, 1, 1, color);
+    });
+    if (cross && Math.floor(time * 1.5) % 2 === 0) drawCross(R, CLOUD_X + 3, CLOUD_Y + 1, OFF.red);
+    if (waiting) {
+      const dot = Math.floor(time * 3) % 3;
+      for (let i = 0; i < 3; i++) R(CLOUD_X + 2 + i * 2, CLOUD_Y + 2 - (i === dot ? 1 : 0), 1, 1, C.bubble);
+    }
+  }
+
+  function drawScene() {
+    const sc = sceneLayout();
+    const s = sc.s;
+    const ph = scenePhase();
+    const p = scenePose(ph);
+    const px = sc.x + p.shake * s;
+    const py = sc.y;
+    const R0 = (x, y, w, h, c) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(px + x * s, py + y * s, w * s, h * s);
+    };
+    const R = (x, y, w, h, c) => R0(x, y - p.lift, w, h, c);
+
+    // Plug and cloud fade out once awake, and back in when the connection drops.
+    let props = 1;
+    if (ph.id === 'wake' && ph.p > 0.75) props = 1 - (ph.p - 0.75) / 0.25;
+    if (ph.id === 'shutdown' && ph.p < 0.12) props = ph.p / 0.12;
+    ctx.globalAlpha = clamp01(props);
+    drawPlug(R0, ph);
+    drawCloud(R0, ph);
+    ctx.globalAlpha = 1;
+
+    R0(2, GH, 11, 1, C.shadow);
+    let q = drawBody(R, p, OFF.body, -1);
+    drawEyes(R, p, q, OFF.eye);
+    if (p.fill > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, py + (GH + 1 - p.fill * 17) * s, W, H);
+      ctx.clip();
+      q = drawBody(R, p, C.body, -1);
+      drawEyes(R, p.eyes === 'off' ? { ...p, eyes: 'closed' } : p, q, C.eye);
+      ctx.restore();
+    }
+  }
+
+  function sceneOctopusAt(x, y) {
+    const sc = sceneLayout();
+    return x >= sc.x && x <= sc.x + GW * sc.s && y >= sc.y && y <= sc.y + (GH + 1) * sc.s;
+  }
+
   function render() {
     ctx.clearRect(0, 0, W, H);
+    if (sceneVisible()) {
+      drawScene();
+      return;
+    }
     drawLinks();
     actors.slice().sort((a, b) => a.y - b.y).forEach(drawActor);
     for (const p of particles) {
@@ -979,6 +1265,7 @@
   window.addEventListener('message', (event) => {
     const m = event.data;
     if (m && m.type === 'agents') reconcile(m.agents, m.completed, m.compacted);
+    if (m && m.type === 'connection') onConnection(m);
   });
 
   function actorAt(x, y) {
@@ -988,10 +1275,16 @@
   }
 
   canvas.addEventListener('mousemove', (e) => {
-    canvas.style.cursor = actorAt(e.offsetX, e.offsetY) ? 'pointer' : 'default';
+    const over = sceneVisible() ? sceneOctopusAt(e.offsetX, e.offsetY) : actorAt(e.offsetX, e.offsetY);
+    canvas.style.cursor = over ? 'pointer' : 'default';
   });
 
   canvas.addEventListener('click', (e) => {
+    if (sceneVisible()) {
+      // Clicking the switched-off octopus checks the connection again right away.
+      if (sceneOctopusAt(e.offsetX, e.offsetY) && !link.anim) vscode.postMessage({ type: 'checkConnection' });
+      return;
+    }
     const actor = actorAt(e.offsetX, e.offsetY);
     if (!actor) return;
     actor.pokedAt = time;

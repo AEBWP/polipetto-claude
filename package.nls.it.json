@@ -6,5 +6,7 @@
   "config.showInExplorer": "Mostra il polipetto nella barra laterale Esplora.",
   "config.showInSourceControl": "Mostra il polipetto nella barra laterale Controllo del codice sorgente.",
   "config.showInRunAndDebug": "Mostra il polipetto nella barra laterale Esegui e debug.",
-  "config.showInTesting": "Mostra il polipetto nella barra laterale Test."
+  "config.showInTesting": "Mostra il polipetto nella barra laterale Test.",
+  "config.connectionCheck": "Spegne il polipetto quando il server di Claude non è raggiungibile, per esempio se cade la VPN. Il controllo avviene ogni 30 secondi, e ogni 10 secondi mentre il polipetto è spento.",
+  "config.claudeUrl": "Indirizzo del server di Claude da controllare. Se vuoto usa ANTHROPIC_BASE_URL dall'ambiente o dalle impostazioni di Claude Code, altrimenti https://api.anthropic.com."
 }

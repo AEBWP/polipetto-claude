@@ -54,6 +54,14 @@ Un agente che ne lancia altri diventa viola, si sposta sopra di loro ed è colle
 
 Clicca un polipetto per aprire una nuova sessione di Claude Code in una scheda.
 
+## Quando Claude non è raggiungibile
+
+Il polipetto parte spento: grigio e afflosciato, con la spina per terra accanto alla presa e sopra di lui una nuvoletta che rappresenta il server di Claude. Mentre l'estensione controlla la connessione, la spina prova ad arrivare alla presa e un pacchetto parte verso la nuvola, ma si perde a metà strada. Se il server non è raggiungibile, la linea a puntini è interrotta e sulla nuvola compare una croce rossa.
+
+Appena il server di Claude risponde, la spina entra, la nuvola diventa arancione e il colore risale nel polipetto, che si sveglia con un saltello. Se poi la connessione cade, per esempio quando si scollega la VPN, la spina salta fuori e il polipetto si spegne di nuovo.
+
+La connessione viene controllata ogni 30 secondi, e ogni 10 secondi mentre il polipetto è spento. Clicca il polipetto spento per ricontrollare subito. Qualsiasi risposta del server conta come raggiungibile, anche un errore.
+
 ## Requisiti
 
 [Claude Code](https://claude.com/claude-code), come estensione di VS Code o da riga di comando. Per aprire una nuova sessione con un clic serve l'estensione di VS Code.
@@ -67,12 +75,14 @@ Clicca un polipetto per aprire una nuova sessione di Claude Code in una scheda.
 | `polipetto.showInSourceControl` | `true` | Mostra il polipetto nella barra laterale Controllo del codice sorgente. |
 | `polipetto.showInRunAndDebug` | `false` | Mostra il polipetto nella barra laterale Esegui e debug. |
 | `polipetto.showInTesting` | `false` | Mostra il polipetto nella barra laterale Test. |
+| `polipetto.connectionCheck` | `true` | Spegne il polipetto quando il server di Claude non è raggiungibile. |
+| `polipetto.claudeUrl` | vuoto | Indirizzo del server di Claude da controllare. Se vuoto usa `ANTHROPIC_BASE_URL` dall'ambiente o dal `settings.json` di Claude Code, altrimenti `https://api.anthropic.com`. |
 
 Per averlo sempre in vista, trascina la sua sezione nella barra laterale secondaria, che non cambia quando passi da una scheda all'altra a sinistra.
 
 ## Privacy
 
-L'estensione legge solo i file di sessione che Claude Code tiene sul tuo computer, in `~/.claude/projects` o `CLAUDE_CONFIG_DIR`, per sapere quale strumento è in uso. Non modifica la configurazione di Claude Code, non invia nulla in rete e non raccoglie dati.
+L'estensione legge solo i file di sessione che Claude Code tiene sul tuo computer, in `~/.claude/projects` o `CLAUDE_CONFIG_DIR`, per sapere quale strumento è in uso. Per sapere se Claude è raggiungibile invia al server di Claude una richiesta `HEAD` vuota, senza dati né credenziali; si può disattivare con `polipetto.connectionCheck`. Non modifica la configurazione di Claude Code, non invia nient'altro in rete e non raccoglie dati.
 
 ## Limiti noti
 

@@ -54,6 +54,14 @@ An agent that launches others turns purple, moves above them and is connected to
 
 Click an octopus to start a new Claude Code session in a tab.
 
+## When Claude cannot be reached
+
+The octopus starts switched off: grey and slumped, its plug lying on the floor next to the socket, with a little cloud above it that stands for Claude's server. While the extension checks the connection, the plug tries to reach the socket and a packet heads for the cloud but gets lost halfway. When the server cannot be reached, the dotted line is broken and the cloud shows a red cross.
+
+As soon as Claude's server answers, the plug goes in, the cloud turns orange and the colour rises back into the octopus, which hops awake. If the connection drops later, for example when a VPN disconnects, the plug pops out and the octopus switches off again.
+
+The connection is checked every 30 seconds, and every 10 seconds while the octopus is off. Click the switched-off octopus to check right away. Any answer from the server counts as reachable, even an error.
+
 ## Requirements
 
 [Claude Code](https://claude.com/claude-code), as the VS Code extension or the command-line tool. Opening a new session with a click needs the VS Code extension.
@@ -67,12 +75,14 @@ Click an octopus to start a new Claude Code session in a tab.
 | `polipetto.showInSourceControl` | `true` | Show the octopus in the Source Control sidebar. |
 | `polipetto.showInRunAndDebug` | `false` | Show the octopus in the Run and Debug sidebar. |
 | `polipetto.showInTesting` | `false` | Show the octopus in the Testing sidebar. |
+| `polipetto.connectionCheck` | `true` | Switch the octopus off while Claude's server cannot be reached. |
+| `polipetto.claudeUrl` | empty | Address of Claude's server to check. When empty, uses `ANTHROPIC_BASE_URL` from the environment or from Claude Code's `settings.json`, otherwise `https://api.anthropic.com`. |
 
 To keep the octopus always in view, drag its section to the Secondary Side Bar, which does not change when you switch tab on the left.
 
 ## Privacy
 
-The extension only reads the session files Claude Code keeps on your computer, in `~/.claude/projects` or `CLAUDE_CONFIG_DIR`. It uses them to know which tool is running. It does not change Claude Code's configuration, send anything over the network, or collect data.
+The extension only reads the session files Claude Code keeps on your computer, in `~/.claude/projects` or `CLAUDE_CONFIG_DIR`. It uses them to know which tool is running. To know whether Claude can be reached, it sends an empty `HEAD` request to Claude's server, with no data and no credentials; turn this off with `polipetto.connectionCheck`. It does not change Claude Code's configuration, send anything else over the network, or collect data.
 
 ## Known limits
 

@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { Tracker } = require('./tracker');
+const { Connectivity, resolveUrl } = require('./connectivity');
 
 const TICK_MS = 1000;
 
@@ -31,7 +32,33 @@ class PolipettoView {
     this.views = new Set();
     this.tracker = null;
     this.timer = null;
+    this.link = null;
     this.restart();
+    this.restartLink();
+  }
+
+  /** Watches whether Claude's server answers, so the octopus can switch off when it does not. */
+  restartLink() {
+    if (this.link) this.link.stop();
+    this.link = null;
+    const config = vscode.workspace.getConfiguration('polipetto');
+    if (config.get('connectionCheck')) {
+      this.link = new Connectivity({
+        url: resolveUrl({ configured: config.get('claudeUrl') }),
+        onChange: () => this.postLink(),
+      });
+      this.link.start();
+    }
+    this.postLink();
+  }
+
+  linkMessage() {
+    if (!this.link) return { type: 'connection', disabled: true };
+    return { type: 'connection', ...this.link.state() };
+  }
+
+  postLink() {
+    for (const view of this.views) view.webview.postMessage(this.linkMessage());
   }
 
   newSession() {
@@ -57,6 +84,11 @@ class PolipettoView {
     this.timer = null;
   }
 
+  dispose() {
+    this.stop();
+    if (this.link) this.link.stop();
+  }
+
   post(snapshot) {
     for (const view of this.views) view.webview.postMessage({ type: 'agents', ...snapshot });
   }
@@ -68,7 +100,10 @@ class PolipettoView {
     view.webview.onDidReceiveMessage((m) => {
       if (!m) return;
       if (m.type === 'ready') {
+        view.webview.postMessage(this.linkMessage());
         view.webview.postMessage({ type: 'agents', agents: this.tracker.snapshot(), completed: [] });
+      } else if (m.type === 'checkConnection') {
+        if (this.link) this.link.now();
       } else if (m.type === 'newSession') {
         this.newSession();
       }
@@ -110,9 +145,12 @@ function activate(context) {
     ),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('polipetto.scope')) provider.restart();
+      if (e.affectsConfiguration('polipetto.connectionCheck') || e.affectsConfiguration('polipetto.claudeUrl')) {
+        provider.restartLink();
+      }
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => provider.restart()),
-    { dispose: () => provider.stop() }
+    { dispose: () => provider.dispose() }
   );
 }
 
